@@ -1,14 +1,16 @@
 typedef unsigned char C,*S;typedef char G;typedef short H;typedef int I;typedef long J;
 #define R return
 #define C(x,y) case x:{y;break;}
+J swap(J*x,J*y){J t=*x;*x=*y;*y=t;R t;}
 enum{rax,rcx,rdx,rbx,rsp,rbp,rsi,rdi,
       r8, r9,r10,r11,r12,r13,r14,r15};
-enum{r,u,z,f,s,b,y,x,       //r(accum/return) s(stack) i,j(scratch) x,y,z,u,v,w(parms) a,b,c,d,e,f(save state).   s,b,c,d no RM mode
-     v,w,i,j,d,a,c,e};    
 enum{syscall,ret,mov,add,sub,imul,cqo,idiv,nop};
-J swap(J*x,J*y){J t=*x;*x=*y;*y=t;R t;}    // store load  immediate
+enum{rr=1,  //reg reg mode
+     mr=2,  //mem reg
+     rm=4,  //reg mem
+     ri=8}; //reg immediate
 
-J as(G*b,J o,J d,J s,J m) //m is 1:RR, 2:MR, 4:RM, 8:RI.  return inst length
+J as(G*b,J o,J d,J s,J m)
 {G*a=b;
  G rex(G w){R 0x48|w*8|(s>7)*4|d>7;}
  G modrm(){R (0||m&1)*0xC0|(s&7)*8|d&7;}
@@ -30,24 +32,24 @@ J as(G*b,J o,J d,J s,J m) //m is 1:RR, 2:MR, 4:RM, 8:RI.  return inst length
 #include<stdio.h>
 #include<stdlib.h>
 #define O printf
-int test1()
-{C b[128]={0};
+int test()
+{C b[99]={0};
  FILE*f=fopen("o","w");
  I i=0;
- i+=as(b+i,mov,rax,r8,1);
- i+=as(b+i,mov,rax,r8,2);
- i+=as(b+i,mov,rax,r8,4);
- i+=as(b+i,mov,rax,-1,8);
- i+=as(b+i,mov,r8,-1,8);
- i+=as(b+i,imul,r8,0,1);
- i+=as(b+i,idiv,r8,0,1);
+ i+=as(b+i,mov,rax,r8,rr);
+ i+=as(b+i,mov,rax,r8,mr);
+ i+=as(b+i,mov,rax,r8,rm);
+ i+=as(b+i,mov,rax,-1,ri);
+ i+=as(b+i,mov,r8, -1,ri);
+ i+=as(b+i,imul,r8,0,rr);
+ i+=as(b+i,idiv,r8,0,rr);
  i+=as(b+i,ret,0,0,0);
  fwrite(b,i,1,f);
  fclose(f);
  return system("objdump -Mintel -b binary -D -m i386:x86-64 o");
 }
 C*bs(C**c,J o,J d,J s,J m) { R *c+=as(*c,o,d,s,m); }
-int elf42()
+int elf()
 {C b[999]={  /*J org=0x400000;*/
   0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x3e, 0x00, 0x01, 0x00, 0x00, 0x00,
@@ -62,18 +64,18 @@ int elf42()
   /*112*/ 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
   /*120*/
  };
- C*a=b+120,**c=&a;
- bs(c,mov,rax,231,8);
- bs(c,mov,rdi,42,8);
- bs(c,syscall,0,0,0);
- *(J*)(b+ 96)=a-b;
- *(J*)(b+104)=a-b;
+ C*a=b+120;
+ bs(&a,mov,rax,60,ri);
+ bs(&a,mov,rdi,42,ri);
+ bs(&a,syscall,0,0,0);
+ *(J*)(b+ 96)=*(J*)(b+104)=a-b;
  FILE*f=fopen("elf","w");
  fwrite(b,a-b,1,f);
  fclose(f);
+ int s=system("chmod +x elf");s=system("./elf;echo $?");
 }
 
 int main()
-{test1(); //sbrk mprotect
- elf42();
+{test();
+ elf();
 }
