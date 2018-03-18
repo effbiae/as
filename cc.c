@@ -1,41 +1,79 @@
 typedef unsigned char C,*S;typedef char G;typedef short H;typedef int I;typedef long J;
 #define R return
 #define C(x,y) case x:{y;break;}
-enum{ax,cx, dx, bx, sp, bp, si, di,
-     r8,r9,r10,r11,r12,r13,r14,r15};
-enum{o,u,z,g,s,b,y,x,       //o(accum) s(stack) i,j(scratch) x,y,z,u,v,w(parms) b,c,d,e,f,g(save state).   s,b,c,d no RM mode
-     v,w,i,j,c,d,e,f};    
-enum{ret,mov,add,sub,imul,cqo,idiv,nop};
+enum{rax,rcx,rdx,rbx,rsp,rbp,rsi,rdi,
+      r8, r9,r10,r11,r12,r13,r14,r15};
+enum{r,u,z,f,s,b,y,x,       //r(accum/return) s(stack) i,j(scratch) x,y,z,u,v,w(parms) a,b,c,d,e,f(save state).   s,b,c,d no RM mode
+     v,w,i,j,d,a,c,e};    
+enum{syscall,ret,mov,add,sub,imul,cqo,idiv,nop};
 J swap(J*x,J*y){J t=*x;*x=*y;*y=t;R t;}    // store load  immediate
-J as(G*b,J o,J x,J y,J m) //m is 1:RR, 2:MR, 4:RM, 8:RI.  return inst length
+
+J as(G*b,J o,J d,J s,J m) //m is 1:RR, 2:MR, 4:RM, 8:RI.  return inst length
 {G*a=b;
- G rex(G w){R 0x48|w*8|(x>7)*4|y>7;}
- G modrm(){R (0||m&1)*0xC0|(x&7)*8|y&7;}
- G*dir(G p){if(m&2)swap(&x,&y),p+=2;*a++=rex(0),*a++=p,*a++=modrm();}
+ G rex(G w){R 0x48|w*8|(s>7)*4|d>7;}
+ G modrm(){R (0||m&1)*0xC0|(s&7)*8|d&7;}
+ G*dir(G p){if(m&2)swap(&s,&d),p+=2;*a++=rex(0),*a++=p,*a++=modrm();}
  switch(o){
+ C(syscall,(*a++=0x0F,*a++=0x05))
  C(ret,*a++=0xC3)
  C(add,dir(0x01))
  C(sub,dir(0x29))
- C(mov,(m&8?*a++=0x48+(x>7),*a++=0xb8+x%8,*(J*)a=y,a+=8  //immediate, 
+ C(mov,(m&8?*a++=0x48+(d>7),*a++=0xb8+d%8,*(J*)a=s,a+=8  //immediate, 
            :dir(0x89)))
  C(cqo, (*a++=0x48,*a++=0x99))
- C(idiv,(y=7,*a++=rex(1),*a++=0xF7,*a++=modrm()))
- C(imul,(y=5,*a++=rex(1),*a++=0xF7,*a++=modrm()))
+ case imul:case idiv:s=o==imul?5:7,*a++=rex(1),*a++=0xF7,*a++=modrm();break;
  default:*(I*)0;
  }
  R a-b;
 }
+
 #include<stdio.h>
+#include<stdlib.h>
 #define O printf
-int main()
+int test1()
 {C b[128]={0};
  FILE*f=fopen("o","w");
  I i=0;
- i+=as(b+i,mov,ax,cx,1);
- i+=as(b+i,mov,ax,cx,2);
- i+=as(b+i,mov,ax,cx,4);
- i+=as(b+i,mov,ax,0xdeadbeef,8);
+ i+=as(b+i,mov,rax,r8,1);
+ i+=as(b+i,mov,rax,r8,2);
+ i+=as(b+i,mov,rax,r8,4);
+ i+=as(b+i,mov,rax,-1,8);
+ i+=as(b+i,mov,r8,-1,8);
+ i+=as(b+i,imul,r8,0,1);
+ i+=as(b+i,idiv,r8,0,1);
  i+=as(b+i,ret,0,0,0);
  fwrite(b,i,1,f);
  fclose(f);
+ return system("objdump -Mintel -b binary -D -m i386:x86-64 o");
+}
+C*bs(C**c,J o,J d,J s,J m) { R *c+=as(*c,o,d,s,m); }
+int elf42()
+{C b[999]={  /*J org=0x400000;*/
+  0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x3e, 0x00, 0x01, 0x00, 0x00, 0x00,
+  0x78, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x38, 0x00, 0x01, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00,
+  /* 96*/ 0xee, 0xee, 0xee, 0xee, 0xee, 0xee, 0xee, 0xee, 
+  /*104*/ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+  /*112*/ 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+  /*120*/
+ };
+ C*a=b+120,**c=&a;
+ bs(c,mov,rax,231,8);
+ bs(c,mov,rdi,42,8);
+ bs(c,syscall,0,0,0);
+ *(J*)(b+ 96)=a-b;
+ *(J*)(b+104)=a-b;
+ FILE*f=fopen("elf","w");
+ fwrite(b,a-b,1,f);
+ fclose(f);
+}
+
+int main()
+{test1(); //sbrk mprotect
+ elf42();
 }
