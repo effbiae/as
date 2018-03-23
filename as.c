@@ -1,7 +1,5 @@
 typedef unsigned char C,*S;typedef char G;typedef short H;typedef int I;typedef long J;
-#define R return
-#define C(x,y) case x:{y;break;}
-J swap(J*x,J*y){J t=*x;*x=*y;*y=t;R t;}
+J swap(J*x,J*y){J t=*x;*x=*y;*y=t;return t;}
 enum{rax,rcx,rdx,rbx,rsp,rbp,rsi,rdi,
       r8, r9,r10,r11,r12,r13,r14,r15};
 enum{syscall,ret,mov,add,sub,imul,cqo,idiv,nop};
@@ -10,10 +8,11 @@ enum{rr=1,  //reg reg mode
      rm=4,  //reg mem
      ri=8}; //reg immediate
 
+#define C(x,y) case x:{y;break;}
 J as(G*b,J o,J d,J s,J m)
 {G*a=b;
- G rex(G w){R 0x48|w*8|(s>7)*4|d>7;}
- G modrm(){R (0||m&1)*0xC0|(s&7)*8|d&7;}
+ G rex(G w){return 0x48|w*8|(s>7)*4|d>7;}
+ G modrm(){return (0||m&1)*0xC0|(s&7)*8|d&7;}
  G*dir(G p){if(m&2)swap(&s,&d),p+=2;*a++=rex(0),*a++=p,*a++=modrm();}
  switch(o){
  C(syscall,(*a++=0x0F,*a++=0x05))
@@ -26,7 +25,7 @@ J as(G*b,J o,J d,J s,J m)
  case imul:case idiv:s=o==imul?5:7,*a++=rex(1),*a++=0xF7,*a++=modrm();break;
  default:*(I*)0;
  }
- R a-b;
+ return a-b;
 }
 
 #include<stdio.h>
@@ -48,7 +47,7 @@ int test()
  fclose(f);
  return system("objdump -Mintel -b binary -D -m i386:x86-64 o");
 }
-C*bs(C**c,J o,J d,J s,J m) { R *c+=as(*c,o,d,s,m); }
+C*bs(C**c,J o,J d,J s,J m) { return *c+=as(*c,o,d,s,m); }
 int elf()
 {C b[999]={  /*J org=0x400000;*/
   0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
