@@ -30,7 +30,6 @@ J as(G*b,J o,J d,J s,J m)
 
 #include<stdio.h>
 #include<stdlib.h>
-#define O printf
 int test()
 {C b[99]={0};
  FILE*f=fopen("o","w");
